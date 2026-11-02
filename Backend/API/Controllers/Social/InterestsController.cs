@@ -22,6 +22,7 @@ public class InterestsController : ControllerBase
     /// </summary>
     [HttpGet]
     [AllowAnonymous]
+    [ResponseCache(Duration = 120, Location = ResponseCacheLocation.Client)]
     [ProducesResponseType(typeof(IReadOnlyList<InterestDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllInterests(CancellationToken cancellationToken)
     {

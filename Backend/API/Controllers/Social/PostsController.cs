@@ -116,10 +116,11 @@ public class PostsController : ControllerBase
         [FromQuery] int pageSize = 20,
         [FromQuery] string? seenIds = null,
         [FromHeader(Name = "X-Seen-Post-Ids")] string? headerSeenIds = null,
+        [FromQuery] DateTime? before = null,
         CancellationToken cancellationToken = default)
     {
         var parsedSeenIds = ParseGuids(seenIds, headerSeenIds);
-        var posts = await _postService.GetRecentPostsAsync(page, pageSize, parsedSeenIds, cancellationToken);
+        var posts = await _postService.GetRecentPostsAsync(page, pageSize, parsedSeenIds, before, cancellationToken);
         return Ok(posts);
     }
 
@@ -157,6 +158,7 @@ public class PostsController : ControllerBase
     /// </summary>
     [HttpGet("user/{userId:guid}/count")]
     [AllowAnonymous]
+    [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserPostCount(Guid userId, CancellationToken cancellationToken = default)
     {

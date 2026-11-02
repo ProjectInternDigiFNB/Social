@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Application.Common;
 using Application.DTOs.Posts;
 using Application.DTOs.Recommendation;
@@ -19,6 +20,7 @@ public sealed class FeedService : IFeedService
     private readonly ICacheService _cacheService;
     private readonly IMapper _mapper;
     private readonly ILogger<FeedService> _logger;
+    private readonly IServerTimingMetrics? _timingMetrics;
 
     public FeedService(
         IUnitOfWork unitOfWork,
@@ -26,7 +28,8 @@ public sealed class FeedService : IFeedService
         IRecommendationService recommendationService,
         ICacheService cacheService,
         IMapper mapper,
-        ILogger<FeedService> logger)
+        ILogger<FeedService> logger,
+        IServerTimingMetrics? timingMetrics = null)
     {
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
@@ -34,6 +37,7 @@ public sealed class FeedService : IFeedService
         _cacheService = cacheService;
         _mapper = mapper;
         _logger = logger;
+        _timingMetrics = timingMetrics;
     }
 
     public async Task<IReadOnlyList<PostDto>> GetForYouFeedAsync(int page = 1, int pageSize = 20, IEnumerable<Guid>? seenPostIds = null, CancellationToken cancellationToken = default)
@@ -48,13 +52,20 @@ public sealed class FeedService : IFeedService
 
         // 1. Kiểm tra Cache tầng 1: Danh sách ID bài viết đã xếp hạng (Ranked Post IDs)
         // Áp dụng cho CẢ page 1 và phân trang, phục vụ tức thì (< 80ms)
+        var swCache = Stopwatch.StartNew();
         var cachedIds = await _cacheService.GetAsync<List<Guid>>(cacheKey, cancellationToken);
+        swCache.Stop();
+        _timingMetrics?.AddMetric("feed_cache", swCache.Elapsed.TotalMilliseconds, "Redis Feed Cache");
+
         if (cachedIds != null && cachedIds.Count > 0)
         {
             var pagedIds = SelectCandidateIdsWithRecirculation(cachedIds, seenSet, page, pageSize);
             if (pagedIds.Count > 0)
             {
+                var swDb = Stopwatch.StartNew();
                 var cachedPosts = await _unitOfWork.Posts.GetPostsByIdsAsync(pagedIds, cancellationToken);
+                swDb.Stop();
+                _timingMetrics?.AddMetric("ef_posts", swDb.Elapsed.TotalMilliseconds, "EF Core Materialize");
                 if (cachedPosts.Count > 0)
                 {
                     var postDict = cachedPosts.ToDictionary(p => p.Id);
@@ -106,7 +117,10 @@ public sealed class FeedService : IFeedService
         }
 
         // Kích hoạt toàn bộ Pipeline gợi ý: Generators (DTOs) -> Aggregator -> Ranking -> Diversity -> Ranked Post IDs
+        var swRank = Stopwatch.StartNew();
         var rankedPostIds = await _recommendationService.GetForYouFeedPostIdsAsync(recommendationContext, cancellationToken);
+        swRank.Stop();
+        _timingMetrics?.AddMetric("ai_rank", swRank.Elapsed.TotalMilliseconds, "AI Recommendation Pipeline");
         List<Guid> finalPoolIds;
 
         if (rankedPostIds.Count == 0)
@@ -135,7 +149,10 @@ public sealed class FeedService : IFeedService
         }
 
         // Hydration: Lấy bài viết đầy đủ chi tiết (kèm TaggedProducts, Author, Images) cho riêng số lượng của trang hiện tại (1 câu split query duy nhất)
+        var swDbMiss = Stopwatch.StartNew();
         var detailedPosts = await _unitOfWork.Posts.GetPostsByIdsAsync(targetPagedIds, cancellationToken);
+        swDbMiss.Stop();
+        _timingMetrics?.AddMetric("ef_posts", swDbMiss.Elapsed.TotalMilliseconds, "EF Core Materialize");
         if (detailedPosts.Count == 0)
         {
             return Array.Empty<PostDto>();

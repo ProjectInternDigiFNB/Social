@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using API.ErrorHandling;
+using Application.Interfaces;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
@@ -18,11 +19,17 @@ public static class ApiServiceExtensions
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
 
+        // 1b. Server-Timing Metrics (W3C Telemetry Header cho Chrome DevTools)
+        services.AddScoped<IServerTimingMetrics, ServerTimingMetrics>();
+
         // 2. Forwarded Headers configuration (chuẩn bị cho 2 tầng proxy: Vercel -> Render)
         services.ConfigureForwardedHeaders();
 
         // 3. CORS configuration
         services.AddApiCors(configuration);
+
+        // 3b. HTTP Response Caching (cho các tài nguyên bán tĩnh như Categories & Interests)
+        services.AddResponseCaching();
 
         // 4. SignalR & Controllers
         services.AddSignalR();
@@ -71,7 +78,8 @@ public static class ApiServiceExtensions
                 }
                 policy.AllowAnyHeader()
                       .AllowAnyMethod()
-                      .AllowCredentials();
+                      .AllowCredentials()
+                      .WithExposedHeaders("Server-Timing");
             });
         });
 

@@ -39,12 +39,15 @@ export const postApi = {
   },
 
   /**
-   * Lấy danh sách bài viết mới nhất
+   * Lấy danh sách bài viết mới nhất (hỗ trợ cả page-based và Keyset/Cursor-based pagination với `before`)
    */
-  getRecentPosts: async (page = 1, pageSize = 20, seenIds?: string[]) => {
+  getRecentPosts: async (page = 1, pageSize = 20, seenIds?: string[], before?: string) => {
     const params: Record<string, any> = { page, pageSize };
     if (seenIds && seenIds.length > 0) {
       params.seenIds = seenIds.join(',');
+    }
+    if (before) {
+      params.before = before;
     }
     const response = await apiClient.get<PostDto[]>('/posts', { params });
     return response.data;

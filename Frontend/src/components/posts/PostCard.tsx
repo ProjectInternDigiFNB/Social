@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PostDto } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationStore, usePostModalStore } from '@/store';
 import { postApi } from '@/api/postApi';
 import { followApi } from '@/api/followApi';
-import { interactionApi } from '@/api/interactionApi';
 import { InteractionType } from '@/types/interaction';
 import { seenPostsService } from '@/utils/seenPosts';
 import { formatRelativeTime } from '@/utils/date';
+import { getOptimizedImageUrl } from '@/utils/media';
+import { interactionQueue } from '@/utils/interactionQueue';
 import {
   Avatar,
   HeartIcon,
@@ -25,7 +26,10 @@ import {
   CopyIcon,
   ChevronDownIcon,
 } from '@/components/common';
-import { CommentSection } from './CommentSection';
+
+const CommentSection = React.lazy(() =>
+  import('./CommentSection').then((m) => ({ default: m.CommentSection }))
+);
 
 const DEFAULT_PRODUCT_THUMB =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23e2e8f0'/%3E%3Cpath d='M30 46l6-8 5 6 7-10 12 16H20z' fill='%2394a3b8'/%3E%3Ccircle cx='32' cy='28' r='4' fill='%2394a3b8'/%3E%3C/svg%3E";
@@ -252,13 +256,11 @@ export const PostCard: React.FC<PostCardProps> = ({
               seenPostsService.markAsSeen(post.id);
 
               if (isAuthenticated) {
-                interactionApi
-                  .track({
-                    postId: post.id,
-                    interactionType: InteractionType.View,
-                    value: 1.0,
-                  })
-                  .catch(() => {});
+                interactionQueue.enqueue({
+                  postId: post.id,
+                  interactionType: InteractionType.View,
+                  value: 1.0,
+                });
               }
             }
           }, 250);
@@ -364,7 +366,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         <header className="post-entry-header">
           <div className="post-entry-author">
             <Avatar
-              src={post.author.avatarUrl}
+              src={getOptimizedImageUrl(post.author.avatarUrl, { width: 96, height: 96, crop: 'fill' })}
               name={post.author.displayName}
               size="md"
             />
@@ -480,7 +482,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                   title="Bấm để xem ảnh kích thước đầy đủ"
                 >
                   <img
-                    src={url}
+                    src={getOptimizedImageUrl(url, { width: 900, quality: 'auto' })}
                     alt={`post-media-${index}`}
                     loading={isLcpCandidate ? 'eager' : 'lazy'}
                     fetchPriority={isLcpCandidate ? 'high' : 'auto'}
@@ -508,7 +510,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                   title={`Xem chi tiết sản phẩm "${product.name}"`}
                 >
                   <img
-                    src={product.coverImageUrl || DEFAULT_PRODUCT_THUMB}
+                    src={product.coverImageUrl ? getOptimizedImageUrl(product.coverImageUrl, { width: 160, height: 160, crop: 'fill' }) : DEFAULT_PRODUCT_THUMB}
                     alt={product.name}
                     className="tagged-product-thumb"
                     onError={(e) => {
@@ -585,14 +587,24 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
         </footer>
 
-        {/* Expandable Comment Section */}
+        {/* Expandable Comment Section (Lazy Loaded on-demand) */}
         {showComments && (
-          <CommentSection
-            postId={post.id}
-            onCommentCountChange={(count) => {
-              setCommentCount(count);
-            }}
-          />
+          <Suspense
+            fallback={
+              <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Đang tải bình luận...
+                </span>
+              </div>
+            }
+          >
+            <CommentSection
+              postId={post.id}
+              onCommentCountChange={(count) => {
+                setCommentCount(count);
+              }}
+            />
+          </Suspense>
         )}
       </article>
 
@@ -613,23 +625,28 @@ export const PostCard: React.FC<PostCardProps> = ({
             <CloseIcon size={20} />
           </button>
           <div className="image-lightbox-container" onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage} alt="Full resolution view" />
+            <img
+              src={getOptimizedImageUrl(previewImage, { width: 1600, quality: 'auto:good' })}
+              alt="Full resolution view"
+            />
           </div>
         </div>
       )}
 
-      {/* In-app Delete Confirmation Modal */}
-      <ConfirmModal
-        isOpen={showDeleteConfirm}
-        title="Xóa bài viết"
-        message="Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không thể hoàn tác."
-        confirmText="Xóa vĩnh viễn"
-        cancelText="Giữ lại"
-        confirmVariant="danger"
-        isLoading={isDeleting}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-      />
+      {/* In-app Delete Confirmation Modal (Conditional render) */}
+      {showDeleteConfirm && (
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          title="Xóa bài viết"
+          message="Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không thể hoàn tác."
+          confirmText="Xóa vĩnh viễn"
+          cancelText="Giữ lại"
+          confirmVariant="danger"
+          isLoading={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </>
   );
 };

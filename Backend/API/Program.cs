@@ -25,6 +25,9 @@ await app.ApplyMigrationsAndSeedAsync();
 // 2. HTTP Request Pipeline (Thứ tự chuẩn mục 7.3)
 // ==========================================
 
+// 0. Server-Timing (W3C Telemetry cho Chrome DevTools & APM)
+app.UseMiddleware<ServerTimingMiddleware>();
+
 // 1. Forwarded Headers
 app.UseForwardedHeaders();
 
@@ -42,6 +45,9 @@ app.UseHttpsRedirection();
 
 // 5. CORS
 app.UseCors();
+
+// 5b. HTTP Response Caching (Trả về Cache-Control cho client/CDN)
+app.UseResponseCaching();
 
 // 6. Authentication (Đọc JWT từ header hoặc query param cho WebSocket)
 app.UseAuthentication();

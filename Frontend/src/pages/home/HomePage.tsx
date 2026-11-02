@@ -188,7 +188,8 @@ export const HomePage: React.FC = () => {
       if (activeTab === 'following') {
         nextBatch = await postApi.getFollowingFeed(nextPage, PAGE_SIZE, currentSeenIds);
       } else if (activeTab === 'recent') {
-        nextBatch = await postApi.getRecentPosts(nextPage, PAGE_SIZE);
+        const lastPost = posts.length > 0 ? posts[posts.length - 1] : null;
+        nextBatch = await postApi.getRecentPosts(nextPage, PAGE_SIZE, undefined, lastPost?.createdAtUtc);
       } else {
         nextBatch = await postApi.getForYouFeed(nextPage, PAGE_SIZE, currentSeenIds);
       }

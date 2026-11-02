@@ -23,6 +23,7 @@ public class CategoriesController : ControllerBase
     /// Lấy cây danh mục sản phẩm đang hoạt động (Đọc từ Memory Cache)
     /// </summary>
     [HttpGet("api/categories/tree")]
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
     [ProducesResponseType(typeof(IReadOnlyList<CategoryTreeNodeDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTree(CancellationToken cancellationToken)
     {
@@ -46,6 +47,7 @@ public class CategoriesController : ControllerBase
     /// Lấy danh sách thuộc tính của danh mục (kèm thuộc tính kế thừa từ tổ tiên, có Memory Cache)
     /// </summary>
     [HttpGet("api/categories/{id:guid}/attributes")]
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
     [ProducesResponseType(typeof(IReadOnlyList<CategoryAttributeDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAttributes(Guid id, CancellationToken cancellationToken)
     {

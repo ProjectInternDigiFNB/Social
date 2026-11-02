@@ -122,17 +122,17 @@
             return postDto;
         }
 
-        public async Task<IReadOnlyList<PostDto>> GetRecentPostsAsync(int page = 1, int pageSize = 20, IEnumerable<Guid>? seenPostIds = null, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<PostDto>> GetRecentPostsAsync(int page = 1, int pageSize = 20, IEnumerable<Guid>? seenPostIds = null, DateTime? beforeCreatedAtUtc = null, CancellationToken cancellationToken = default)
         {
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 50) pageSize = 20;
 
             // Bảng tin "Mới nhất" hiển thị chuẩn theo thứ tự thời gian tạo giảm dần (CreatedAtUtc DESC)
-            var pagedPosts = await _unitOfWork.Posts.GetRecentPostsAsync(page, pageSize, cancellationToken);
-            if (pagedPosts.Count == 0 && page > 1)
+            var pagedPosts = await _unitOfWork.Posts.GetRecentPostsAsync(page, pageSize, beforeCreatedAtUtc, cancellationToken);
+            if (pagedPosts.Count == 0 && page > 1 && !beforeCreatedAtUtc.HasValue)
             {
                 // Khi cuộn hết các bài mới nhất, tuần hoàn lại từ đầu
-                pagedPosts = await _unitOfWork.Posts.GetRecentPostsAsync(1, pageSize, cancellationToken);
+                pagedPosts = await _unitOfWork.Posts.GetRecentPostsAsync(1, pageSize, null, cancellationToken);
             }
             var postDtos = _mapper.Map<List<PostDto>>(pagedPosts);
 

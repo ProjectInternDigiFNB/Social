@@ -63,9 +63,21 @@ public class PostRepository : GenericRepository<Post>, IPostRepository
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Post>> GetRecentPostsAsync(int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Post>> GetRecentPostsAsync(int page = 1, int pageSize = 20, DateTime? beforeCreatedAtUtc = null, CancellationToken cancellationToken = default)
     {
-        return await GetBasePostQuery()
+        var query = GetBasePostQuery();
+
+        // Keyset (Cursor-based) Pagination: Nếu có mốc thời gian của bài viết trước, tận dụng trực tiếp B-Tree Index trên CreatedAtUtc (O(1))
+        if (beforeCreatedAtUtc.HasValue)
+        {
+            return await query
+                .Where(p => p.CreatedAtUtc < beforeCreatedAtUtc.Value)
+                .OrderByDescending(p => p.CreatedAtUtc)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+        }
+
+        return await query
             .OrderByDescending(p => p.CreatedAtUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
