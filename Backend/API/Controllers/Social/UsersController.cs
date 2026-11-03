@@ -1,6 +1,5 @@
 using Application.DTOs.Interests;
 using Application.Interfaces;
-using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,14 +11,10 @@ namespace API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IInterestService _interestService;
-    private readonly IValidator<SelectInterestsRequestDto> _selectValidator;
 
-    public UsersController(
-        IInterestService interestService,
-        IValidator<SelectInterestsRequestDto> selectValidator)
+    public UsersController(IInterestService interestService)
     {
         _interestService = interestService;
-        _selectValidator = selectValidator;
     }
 
     /// <summary>
@@ -45,12 +40,6 @@ public class UsersController : ControllerBase
         [FromBody] SelectInterestsRequestDto request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _selectValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         await _interestService.SelectMyInterestsAsync(request, cancellationToken);
         return Ok(new { message = "Lưu danh sách sở thích thành công." });
     }

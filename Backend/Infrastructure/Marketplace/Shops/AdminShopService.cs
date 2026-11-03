@@ -7,7 +7,6 @@ using Application.Interfaces.Repositories;
 using Domain.Entities.Marketplace.Shops;
 using Domain.Enums;
 using Domain.Exceptions;
-using Infrastructure.External.Caching;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -108,7 +107,7 @@ public class AdminShopService : IAdminShopService
 
         var items = shops.Select(s =>
         {
-            var hasActiveSanction = s.Sanctions.Any(sn => sn.IsActive(_clock.UtcNow));
+            var hasActiveSanction = s.Sanctions.Any(sn => sn.IsSuspensionActive(_clock.UtcNow));
             var effectiveStatus = ShopStatusCalculator.Compute(s.OwnerUser, s, hasActiveSanction);
 
             orderStats.TryGetValue(s.Id, out var oStat);
@@ -148,7 +147,7 @@ public class AdminShopService : IAdminShopService
         var allReviews = await _unitOfWork.ShopReviews.GetByShopIdAsync(shop.Id, cancellationToken);
         var allSanctions = await _unitOfWork.ShopSanctions.GetByShopIdAsync(shop.Id, cancellationToken);
         var latestReview = allReviews.FirstOrDefault();
-        var activeSanction = allSanctions.FirstOrDefault(sn => sn.IsActive(_clock.UtcNow));
+        var activeSanction = allSanctions.FirstOrDefault(sn => sn.IsSuspensionActive(_clock.UtcNow));
 
         // Additional stats & details for Admin inspection
         var totalOrders = await _dbContext.ShopOrders

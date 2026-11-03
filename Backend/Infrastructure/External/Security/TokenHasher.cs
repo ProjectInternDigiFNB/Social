@@ -1,16 +1,6 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-
 namespace Infrastructure.External.Security;
 
 public static class TokenHasher
 {
-    public static string HashToken(string token)
-    {
-        if (string.IsNullOrEmpty(token))
-            return string.Empty;
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    public static string HashToken(string token) => Application.Common.TokenHasher.HashToken(token);
 }

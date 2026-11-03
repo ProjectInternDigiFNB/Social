@@ -1,4 +1,4 @@
-﻿using Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Application.Interfaces.Repositories.Marketplace.Inventory;
 using Domain.Entities.Marketplace.Inventory;
 using Domain.Enums;
@@ -116,6 +116,16 @@ public class DigitalCodeRepository : IDigitalCodeRepository
 
         var total = available + reserved + delivered + invalid;
         return new InventorySummary(total, available, reserved, delivered, invalid);
+    }
+
+    public async Task<IReadOnlyList<string>> GetDeliveredEncryptedValuesByOrderItemIdAsync(
+        Guid orderItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.DigitalCodes
+            .Where(c => c.OrderItemId == orderItemId && c.Status == DigitalCodeStatus.Delivered)
+            .Select(c => c.ValueEncrypted)
+            .ToListAsync(cancellationToken);
     }
 }
 

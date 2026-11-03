@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Application.Common;
 using Application.DTOs.Marketplace.Shops;
 using Application.Interfaces;
@@ -7,7 +7,6 @@ using Application.Interfaces.Repositories;
 using Domain.Entities.Marketplace.Shops;
 using Domain.Enums;
 using Domain.Exceptions;
-using Infrastructure.External.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -337,36 +336,5 @@ public class ShopService : IShopService
 
 public static class SlugHelper
 {
-    public static string GenerateSlug(string phrase)
-    {
-        if (string.IsNullOrWhiteSpace(phrase)) return Guid.NewGuid().ToString("N")[..8];
-
-        var str = RemoveDiacritics(phrase).ToLowerInvariant().Trim();
-        str = System.Text.RegularExpressions.Regex.Replace(str, @"[^a-z0-9\s-]", "");
-        str = System.Text.RegularExpressions.Regex.Replace(str, @"\s+", "-");
-        str = System.Text.RegularExpressions.Regex.Replace(str, @"-+", "-").Trim('-');
-
-        return string.IsNullOrWhiteSpace(str) ? Guid.NewGuid().ToString("N")[..8] : str;
-    }
-
-    private static string RemoveDiacritics(string text)
-    {
-        var normalizedString = text.Normalize(System.Text.NormalizationForm.FormD);
-        var stringBuilder = new System.Text.StringBuilder(capacity: normalizedString.Length);
-
-        foreach (var c in normalizedString)
-        {
-            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
-            {
-                stringBuilder.Append(c);
-            }
-        }
-
-        return stringBuilder
-            .ToString()
-            .Normalize(System.Text.NormalizationForm.FormC)
-            .Replace('đ', 'd')
-            .Replace('Đ', 'D');
-    }
+    public static string GenerateSlug(string phrase) => Application.Common.SlugHelper.GenerateSlug(phrase);
 }

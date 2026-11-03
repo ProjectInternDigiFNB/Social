@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Application.DTOs.Comments;
 using Application.DTOs.Notifications;
 using Application.DTOs.Posts;
@@ -395,6 +395,74 @@ public class RealtimeNotificationService : IRealtimeNotificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Lỗi khi phát sự kiện PostDeleted cho bài viết {PostId}", postId);
+        }
+    }
+
+    public async Task SendPersistentNotificationToUserAsync(
+        Guid userId,
+        NotificationDto notification,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients.Group($"user_{userId}")
+                .SendAsync("ReceivePersistentNotification", notification, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Không thể gửi realtime thông báo tới user_{UserId}: {Message}", userId, ex.Message);
+        }
+    }
+
+    public async Task PublishProductStockUpdatedAsync(
+        Guid productId,
+        string productSlug,
+        Guid variantId,
+        int availableStock,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients.All.SendAsync("ProductStockUpdated", new
+            {
+                productId,
+                productSlug,
+                variantId,
+                availableStock
+            }, cancellationToken);
+
+            _logger.LogInformation("Đã phát SignalR ProductStockUpdated cho Product {Slug}, Variant {VariantId}: Còn {Available} mã",
+                productSlug, variantId, availableStock);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi khi gửi SignalR ProductStockUpdated cho Variant {VariantId}", variantId);
+        }
+    }
+
+    public async Task PublishPaymentSucceededAsync(
+        Guid checkoutId,
+        Guid paymentId,
+        long amount,
+        DateTime paidAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients.Group($"checkout_{checkoutId}").SendAsync("PaymentSucceeded", new
+            {
+                checkoutId,
+                paymentId,
+                amount,
+                status = "Succeeded",
+                paidAt = paidAtUtc
+            }, cancellationToken);
+
+            _logger.LogInformation("Đã phát SignalR PaymentSucceeded tới group checkout_{CheckoutId}", checkoutId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi khi phát SignalR PaymentSucceeded cho Checkout {CheckoutId}", checkoutId);
         }
     }
 }

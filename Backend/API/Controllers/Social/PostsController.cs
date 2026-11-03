@@ -3,7 +3,6 @@ using Application.DTOs.Comments;
 using Application.DTOs.Likes;
 using Application.DTOs.Posts;
 using Application.Interfaces;
-using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +18,6 @@ public class PostsController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly ILikeService _likeService;
     private readonly ICommentService _commentService;
-    private readonly IValidator<CreatePostRequestDto> _createValidator;
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -34,8 +32,7 @@ public class PostsController : ControllerBase
         IPostMediaStorageService mediaStorageService,
         ICurrentUserService currentUserService,
         ILikeService likeService,
-        ICommentService commentService,
-        IValidator<CreatePostRequestDto> createValidator)
+        ICommentService commentService)
     {
         _postService = postService;
         _feedService = feedService;
@@ -43,7 +40,6 @@ public class PostsController : ControllerBase
         _currentUserService = currentUserService;
         _likeService = likeService;
         _commentService = commentService;
-        _createValidator = createValidator;
     }
 
     /// <summary>
@@ -58,12 +54,6 @@ public class PostsController : ControllerBase
         [FromBody] CreatePostRequestDto request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _createValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         var post = await _postService.CreatePostAsync(request, cancellationToken);
         return CreatedAtAction(nameof(GetPostById), new { id = post.Id }, post);
     }

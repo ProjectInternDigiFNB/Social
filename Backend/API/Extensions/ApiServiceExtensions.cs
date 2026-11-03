@@ -1,6 +1,8 @@
+global using Application.Common.Models;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using API.ErrorHandling;
+using API.Filters;
 using Application.Interfaces;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -33,7 +35,10 @@ public static class ApiServiceExtensions
 
         // 4. SignalR & Controllers
         services.AddSignalR();
-        services.AddControllers()
+        services.AddControllers(options =>
+            {
+                options.Filters.Add<FluentValidationActionFilter>();
+            })
             .AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

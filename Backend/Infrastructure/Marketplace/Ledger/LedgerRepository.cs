@@ -18,6 +18,10 @@ public class LedgerRepository : ILedgerRepository
     public async Task<LedgerAccount?> GetAccountByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         var normalized = code.Trim().ToUpperInvariant();
+        var local = _dbContext.LedgerAccounts.Local
+            .FirstOrDefault(a => string.Equals(a.Code, normalized, StringComparison.OrdinalIgnoreCase));
+        if (local != null) return local;
+
         return await _dbContext.LedgerAccounts
             .FirstOrDefaultAsync(a => a.Code == normalized || a.Code.ToUpper() == normalized, cancellationToken);
     }
@@ -25,6 +29,10 @@ public class LedgerRepository : ILedgerRepository
     public async Task<LedgerAccount> GetOrCreateSystemAccountAsync(LedgerAccountType type, CancellationToken cancellationToken = default)
     {
         var code = LedgerAccount.GenerateAccountCode(type, null);
+        var local = _dbContext.LedgerAccounts.Local
+            .FirstOrDefault(a => string.Equals(a.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (local != null) return local;
+
         var account = await _dbContext.LedgerAccounts
             .FirstOrDefaultAsync(a => a.Code == code || a.Code.ToUpper() == code, cancellationToken);
         if (account != null) return account;
@@ -41,30 +49,23 @@ public class LedgerRepository : ILedgerRepository
         };
 
         account = new LedgerAccount(type, code, name, null);
-        try
-        {
-            await _dbContext.LedgerAccounts.AddAsync(account, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return account;
-        }
-        catch (DbUpdateException)
-        {
-            _dbContext.Entry(account).State = EntityState.Detached;
-            var existing = await _dbContext.LedgerAccounts
-                .FirstOrDefaultAsync(a => a.Code == code || a.Code.ToUpper() == code, cancellationToken);
-            if (existing != null) return existing;
-            throw;
-        }
+        await _dbContext.LedgerAccounts.AddAsync(account, cancellationToken);
+        return account;
     }
 
     public async Task<LedgerAccount> GetOrCreateShopAccountAsync(Guid shopId, LedgerAccountType type, CancellationToken cancellationToken = default)
     {
         var code = LedgerAccount.GenerateAccountCode(type, shopId);
+        var local = _dbContext.LedgerAccounts.Local
+            .FirstOrDefault(a => string.Equals(a.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (local != null) return local;
+
         var account = await _dbContext.LedgerAccounts
             .FirstOrDefaultAsync(a => a.Code == code || a.Code.ToUpper() == code, cancellationToken);
         if (account != null) return account;
 
-        var shop = await _dbContext.Shops.FirstOrDefaultAsync(s => s.Id == shopId, cancellationToken);
+        var shop = _dbContext.Shops.Local.FirstOrDefault(s => s.Id == shopId)
+                ?? await _dbContext.Shops.FirstOrDefaultAsync(s => s.Id == shopId, cancellationToken);
         var shopName = shop?.Name ?? shopId.ToString("N")[..8];
 
         var name = type switch
@@ -76,24 +77,17 @@ public class LedgerRepository : ILedgerRepository
         };
 
         account = new LedgerAccount(type, code, name, shopId);
-        try
-        {
-            await _dbContext.LedgerAccounts.AddAsync(account, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return account;
-        }
-        catch (DbUpdateException)
-        {
-            _dbContext.Entry(account).State = EntityState.Detached;
-            var existing = await _dbContext.LedgerAccounts
-                .FirstOrDefaultAsync(a => a.Code == code || a.Code.ToUpper() == code, cancellationToken);
-            if (existing != null) return existing;
-            throw;
-        }
+        await _dbContext.LedgerAccounts.AddAsync(account, cancellationToken);
+        return account;
     }
 
     public async Task<bool> TransactionExistsAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
+        if (_dbContext.LedgerTransactions.Local.Any(t => t.IdempotencyKey == idempotencyKey))
+        {
+            return true;
+        }
+
         return await _dbContext.LedgerTransactions
             .AnyAsync(t => t.IdempotencyKey == idempotencyKey, cancellationToken);
     }
@@ -105,34 +99,33 @@ public class LedgerRepository : ILedgerRepository
 
     public async Task<ShopBalanceCache?> GetBalanceCacheAsync(Guid shopId, CancellationToken cancellationToken = default)
     {
+        var local = _dbContext.ShopBalanceCaches.Local.FirstOrDefault(b => b.ShopId == shopId);
+        if (local != null) return local;
+
         return await _dbContext.ShopBalanceCaches
             .FirstOrDefaultAsync(b => b.ShopId == shopId, cancellationToken);
     }
 
     public async Task<ShopBalanceCache> GetOrCreateBalanceCacheAsync(Guid shopId, CancellationToken cancellationToken = default)
     {
+        var local = _dbContext.ShopBalanceCaches.Local.FirstOrDefault(b => b.ShopId == shopId);
+        if (local != null) return local;
+
         var cache = await _dbContext.ShopBalanceCaches.FirstOrDefaultAsync(b => b.ShopId == shopId, cancellationToken);
         if (cache != null) return cache;
 
         cache = new ShopBalanceCache(shopId);
-        try
-        {
-            await _dbContext.ShopBalanceCaches.AddAsync(cache, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return cache;
-        }
-        catch (DbUpdateException)
-        {
-            _dbContext.Entry(cache).State = EntityState.Detached;
-            var existing = await _dbContext.ShopBalanceCaches.FirstOrDefaultAsync(b => b.ShopId == shopId, cancellationToken);
-            if (existing != null) return existing;
-            throw;
-        }
+        await _dbContext.ShopBalanceCaches.AddAsync(cache, cancellationToken);
+        return cache;
     }
 
     public void UpdateBalanceCache(ShopBalanceCache cache)
     {
-        _dbContext.ShopBalanceCaches.Update(cache);
+        var entry = _dbContext.Entry(cache);
+        if (entry.State == EntityState.Detached)
+        {
+            _dbContext.ShopBalanceCaches.Update(cache);
+        }
     }
 
     public async Task<(List<LedgerEntry> Items, int TotalCount)> GetShopStatementAsync(

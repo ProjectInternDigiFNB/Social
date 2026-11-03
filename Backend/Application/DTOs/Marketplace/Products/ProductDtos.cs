@@ -300,15 +300,6 @@ public class CatalogProductDetailDto
     public List<ProductAttributeValueDto> AttributeValues { get; set; } = new();
 }
 
-public class PagedResult<T>
-{
-    public IReadOnlyList<T> Items { get; set; } = new List<T>();
-    public int TotalCount { get; set; }
-    public int Page { get; set; }
-    public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / (PageSize > 0 ? PageSize : 1));
-}
-
 public class ProductMediaUploadResponseDto
 {
     public string Url { get; set; } = string.Empty;

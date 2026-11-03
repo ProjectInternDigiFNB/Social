@@ -1,3 +1,4 @@
+global using Application.Common.Models;
 using Application.Common;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
@@ -26,6 +27,8 @@ public static class DependencyInjection
                 b.MigrationsAssembly(typeof(SocialDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IIdempotencyService, IdempotencyService>();
+        services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
 
         // 2. HTTP Context, Current User & System Clock
         services.AddHttpContextAccessor();

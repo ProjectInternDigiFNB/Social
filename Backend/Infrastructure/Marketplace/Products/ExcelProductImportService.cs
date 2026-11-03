@@ -10,8 +10,6 @@ using Domain.Entities.Marketplace.Categories;
 using Domain.Entities.Marketplace.Products;
 using Domain.Entities.Marketplace.Shops;
 using Domain.Enums;
-using Infrastructure.External.Caching;
-using Infrastructure.Marketplace.Shops;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

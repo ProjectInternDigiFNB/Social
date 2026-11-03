@@ -46,6 +46,7 @@ public static class ExternalModule
         services.AddSingleton<ICryptoService, AesGcmCryptoService>();
         services.AddSingleton<ISignedUrlService, SignedUrlService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IGoogleAuthVerifier, GoogleAuthVerifier>();
 
         // 3. JWT Authentication Configuration
         var jwtSection = configuration.GetSection(JwtSettings.SectionName);

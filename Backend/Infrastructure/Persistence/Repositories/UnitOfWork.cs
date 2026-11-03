@@ -1,21 +1,23 @@
-﻿using Infrastructure.Social.Auth;
-using Infrastructure.Social.Profile;
-using Infrastructure.Social.Posts;
-using Infrastructure.Social.Comments;
-using Infrastructure.Social.Follows;
-using Infrastructure.Social.Interests;
-using Infrastructure.Social.Interactions;
-using Infrastructure.Social.Notifications;
 using Application.Interfaces.Repositories;
 using Infrastructure.Persistence;
+using Infrastructure.Social.Auth;
+using Infrastructure.Social.Comments;
+using Infrastructure.Social.Follows;
+using Infrastructure.Social.Interactions;
+using Infrastructure.Social.Interests;
+using Infrastructure.Social.Notifications;
+using Infrastructure.Social.Posts;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Infrastructure.Persistence.Repositories;
 
 public class UnitOfWork : IUnitOfWork
 {
     private readonly SocialDbContext _context;
+    private readonly IServiceProvider? _serviceProvider;
     private IDbContextTransaction? _currentTransaction;
+    private int _transactionDepth;
 
     private IUserRepository? _users;
     private IRefreshTokenRepository? _refreshTokens;
@@ -51,44 +53,51 @@ public class UnitOfWork : IUnitOfWork
     private Application.Interfaces.Repositories.Marketplace.Payouts.IShopBankAccountRepository? _shopBankAccounts;
     private Application.Interfaces.Repositories.Marketplace.Payouts.IPayoutRepository? _payouts;
 
-    public UnitOfWork(SocialDbContext context)
+    public UnitOfWork(SocialDbContext context, IServiceProvider? serviceProvider = null)
     {
         _context = context;
+        _serviceProvider = serviceProvider;
     }
 
-    public IUserRepository Users => _users ??= new UserRepository(_context);
-    public IRefreshTokenRepository RefreshTokens => _refreshTokens ??= new RefreshTokenRepository(_context);
-    public IVerificationTokenRepository VerificationTokens => _verificationTokens ??= new VerificationTokenRepository(_context);
-    public IInterestRepository Interests => _interests ??= new InterestRepository(_context);
-    public IUserInterestRepository UserInterests => _userInterests ??= new UserInterestRepository(_context);
-    public IUserPreferenceRepository UserPreferences => _userPreferences ??= new UserPreferenceRepository(_context);
-    public IPostRepository Posts => _posts ??= new PostRepository(_context);
-    public IPostInterestRepository PostInterests => _postInterests ??= new PostInterestRepository(_context);
-    public IPostLikeRepository PostLikes => _postLikes ??= new PostLikeRepository(_context);
-    public ICommentRepository Comments => _comments ??= new CommentRepository(_context);
-    public IUserFollowRepository UserFollows => _userFollows ??= new UserFollowRepository(_context);
-    public IUserInteractionRepository UserInteractions => _userInteractions ??= new UserInteractionRepository(_context);
-    public INotificationRepository Notifications => _notifications ??= new NotificationRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Shops.IShopRepository Shops => _shops ??= new Infrastructure.Marketplace.Shops.ShopRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Shops.IShopReviewRepository ShopReviews => _shopReviews ??= new Infrastructure.Marketplace.Shops.ShopReviewRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Shops.IShopSanctionRepository ShopSanctions => _shopSanctions ??= new Infrastructure.Marketplace.Shops.ShopSanctionRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRepository Categories => _categories ??= new Infrastructure.Marketplace.Categories.CategoryRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Categories.IAttributeRepository Attributes => _attributes ??= new Infrastructure.Marketplace.Categories.AttributeRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRequestRepository CategoryRequests => _categoryRequests ??= new Infrastructure.Marketplace.Categories.CategoryRequestRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Products.IProductRepository Products => _products ??= new Infrastructure.Marketplace.Products.ProductRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Products.IProductVariantRepository ProductVariants => _productVariants ??= new Infrastructure.Marketplace.Products.ProductVariantRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Products.IProductReviewRepository ProductReviews => _productReviews ??= new Infrastructure.Marketplace.Products.ProductReviewRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalCodeRepository DigitalCodes => _digitalCodes ??= new Infrastructure.Marketplace.Inventory.DigitalCodeRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalFileRepository DigitalFiles => _digitalFiles ??= new Infrastructure.Marketplace.Inventory.DigitalFileRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Orders.ICartRepository Carts => _carts ??= new Infrastructure.Marketplace.Orders.CartRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Orders.ICheckoutRepository Checkouts => _checkouts ??= new Infrastructure.Marketplace.Orders.CheckoutRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Orders.IOrderRepository Orders => _orders ??= new Infrastructure.Marketplace.Orders.OrderRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Payments.IPaymentRepository Payments => _payments ??= new Infrastructure.Marketplace.Payments.PaymentRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Ledger.ILedgerRepository Ledgers => _ledgers ??= new Infrastructure.Marketplace.Ledger.LedgerRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Complaints.IComplaintRepository Complaints => _complaints ??= new Infrastructure.Marketplace.Complaints.ComplaintRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Complaints.IRefundRepository Refunds => _refunds ??= new Infrastructure.Marketplace.Complaints.RefundRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Payouts.IShopBankAccountRepository ShopBankAccounts => _shopBankAccounts ??= new Infrastructure.Marketplace.Payouts.ShopBankAccountRepository(_context);
-    public Application.Interfaces.Repositories.Marketplace.Payouts.IPayoutRepository Payouts => _payouts ??= new Infrastructure.Marketplace.Payouts.PayoutRepository(_context);
+    private TRepository Resolve<TRepository>(Func<SocialDbContext, TRepository> fallbackFactory)
+        where TRepository : class
+    {
+        return _serviceProvider?.GetService<TRepository>() ?? fallbackFactory(_context);
+    }
+
+    public IUserRepository Users => _users ??= Resolve<IUserRepository>(ctx => new UserRepository(ctx));
+    public IRefreshTokenRepository RefreshTokens => _refreshTokens ??= Resolve<IRefreshTokenRepository>(ctx => new RefreshTokenRepository(ctx));
+    public IVerificationTokenRepository VerificationTokens => _verificationTokens ??= Resolve<IVerificationTokenRepository>(ctx => new VerificationTokenRepository(ctx));
+    public IInterestRepository Interests => _interests ??= Resolve<IInterestRepository>(ctx => new InterestRepository(ctx));
+    public IUserInterestRepository UserInterests => _userInterests ??= Resolve<IUserInterestRepository>(ctx => new UserInterestRepository(ctx));
+    public IUserPreferenceRepository UserPreferences => _userPreferences ??= Resolve<IUserPreferenceRepository>(ctx => new UserPreferenceRepository(ctx));
+    public IPostRepository Posts => _posts ??= Resolve<IPostRepository>(ctx => new PostRepository(ctx));
+    public IPostInterestRepository PostInterests => _postInterests ??= Resolve<IPostInterestRepository>(ctx => new PostInterestRepository(ctx));
+    public IPostLikeRepository PostLikes => _postLikes ??= Resolve<IPostLikeRepository>(ctx => new PostLikeRepository(ctx));
+    public ICommentRepository Comments => _comments ??= Resolve<ICommentRepository>(ctx => new CommentRepository(ctx));
+    public IUserFollowRepository UserFollows => _userFollows ??= Resolve<IUserFollowRepository>(ctx => new UserFollowRepository(ctx));
+    public IUserInteractionRepository UserInteractions => _userInteractions ??= Resolve<IUserInteractionRepository>(ctx => new UserInteractionRepository(ctx));
+    public INotificationRepository Notifications => _notifications ??= Resolve<INotificationRepository>(ctx => new NotificationRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Shops.IShopRepository Shops => _shops ??= Resolve<Application.Interfaces.Repositories.Marketplace.Shops.IShopRepository>(ctx => new Infrastructure.Marketplace.Shops.ShopRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Shops.IShopReviewRepository ShopReviews => _shopReviews ??= Resolve<Application.Interfaces.Repositories.Marketplace.Shops.IShopReviewRepository>(ctx => new Infrastructure.Marketplace.Shops.ShopReviewRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Shops.IShopSanctionRepository ShopSanctions => _shopSanctions ??= Resolve<Application.Interfaces.Repositories.Marketplace.Shops.IShopSanctionRepository>(ctx => new Infrastructure.Marketplace.Shops.ShopSanctionRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRepository Categories => _categories ??= Resolve<Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRepository>(ctx => new Infrastructure.Marketplace.Categories.CategoryRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Categories.IAttributeRepository Attributes => _attributes ??= Resolve<Application.Interfaces.Repositories.Marketplace.Categories.IAttributeRepository>(ctx => new Infrastructure.Marketplace.Categories.AttributeRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRequestRepository CategoryRequests => _categoryRequests ??= Resolve<Application.Interfaces.Repositories.Marketplace.Categories.ICategoryRequestRepository>(ctx => new Infrastructure.Marketplace.Categories.CategoryRequestRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Products.IProductRepository Products => _products ??= Resolve<Application.Interfaces.Repositories.Marketplace.Products.IProductRepository>(ctx => new Infrastructure.Marketplace.Products.ProductRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Products.IProductVariantRepository ProductVariants => _productVariants ??= Resolve<Application.Interfaces.Repositories.Marketplace.Products.IProductVariantRepository>(ctx => new Infrastructure.Marketplace.Products.ProductVariantRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Products.IProductReviewRepository ProductReviews => _productReviews ??= Resolve<Application.Interfaces.Repositories.Marketplace.Products.IProductReviewRepository>(ctx => new Infrastructure.Marketplace.Products.ProductReviewRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalCodeRepository DigitalCodes => _digitalCodes ??= Resolve<Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalCodeRepository>(ctx => new Infrastructure.Marketplace.Inventory.DigitalCodeRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalFileRepository DigitalFiles => _digitalFiles ??= Resolve<Application.Interfaces.Repositories.Marketplace.Inventory.IDigitalFileRepository>(ctx => new Infrastructure.Marketplace.Inventory.DigitalFileRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Orders.ICartRepository Carts => _carts ??= Resolve<Application.Interfaces.Repositories.Marketplace.Orders.ICartRepository>(ctx => new Infrastructure.Marketplace.Orders.CartRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Orders.ICheckoutRepository Checkouts => _checkouts ??= Resolve<Application.Interfaces.Repositories.Marketplace.Orders.ICheckoutRepository>(ctx => new Infrastructure.Marketplace.Orders.CheckoutRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Orders.IOrderRepository Orders => _orders ??= Resolve<Application.Interfaces.Repositories.Marketplace.Orders.IOrderRepository>(ctx => new Infrastructure.Marketplace.Orders.OrderRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Payments.IPaymentRepository Payments => _payments ??= Resolve<Application.Interfaces.Repositories.Marketplace.Payments.IPaymentRepository>(ctx => new Infrastructure.Marketplace.Payments.PaymentRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Ledger.ILedgerRepository Ledgers => _ledgers ??= Resolve<Application.Interfaces.Repositories.Marketplace.Ledger.ILedgerRepository>(ctx => new Infrastructure.Marketplace.Ledger.LedgerRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Complaints.IComplaintRepository Complaints => _complaints ??= Resolve<Application.Interfaces.Repositories.Marketplace.Complaints.IComplaintRepository>(ctx => new Infrastructure.Marketplace.Complaints.ComplaintRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Complaints.IRefundRepository Refunds => _refunds ??= Resolve<Application.Interfaces.Repositories.Marketplace.Complaints.IRefundRepository>(ctx => new Infrastructure.Marketplace.Complaints.RefundRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Payouts.IShopBankAccountRepository ShopBankAccounts => _shopBankAccounts ??= Resolve<Application.Interfaces.Repositories.Marketplace.Payouts.IShopBankAccountRepository>(ctx => new Infrastructure.Marketplace.Payouts.ShopBankAccountRepository(ctx));
+    public Application.Interfaces.Repositories.Marketplace.Payouts.IPayoutRepository Payouts => _payouts ??= Resolve<Application.Interfaces.Repositories.Marketplace.Payouts.IPayoutRepository>(ctx => new Infrastructure.Marketplace.Payouts.PayoutRepository(ctx));
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -99,10 +108,12 @@ public class UnitOfWork : IUnitOfWork
     {
         if (_currentTransaction != null)
         {
+            _transactionDepth++;
             return;
         }
 
         _currentTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        _transactionDepth = 1;
     }
 
     public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
@@ -112,21 +123,19 @@ public class UnitOfWork : IUnitOfWork
             await _context.SaveChangesAsync(cancellationToken);
             if (_currentTransaction != null)
             {
-                await _currentTransaction.CommitAsync(cancellationToken);
+                _transactionDepth = Math.Max(0, _transactionDepth - 1);
+                if (_transactionDepth == 0)
+                {
+                    await _currentTransaction.CommitAsync(cancellationToken);
+                    await _currentTransaction.DisposeAsync();
+                    _currentTransaction = null;
+                }
             }
         }
         catch
         {
             await RollbackTransactionAsync(cancellationToken);
             throw;
-        }
-        finally
-        {
-            if (_currentTransaction != null)
-            {
-                await _currentTransaction.DisposeAsync();
-                _currentTransaction = null;
-            }
         }
     }
 
@@ -141,6 +150,7 @@ public class UnitOfWork : IUnitOfWork
         }
         finally
         {
+            _transactionDepth = 0;
             if (_currentTransaction != null)
             {
                 await _currentTransaction.DisposeAsync();

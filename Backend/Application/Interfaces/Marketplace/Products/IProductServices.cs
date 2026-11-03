@@ -11,6 +11,7 @@ public interface IProductService
     Task<ProductDetailDto> UpdateVariantsAsync(Guid userId, Guid productId, UpdateProductVariantsRequest request, CancellationToken cancellationToken = default);
     Task<ProductDetailDto> SaveAttributesAsync(Guid userId, Guid productId, SaveProductAttributeValuesRequest request, CancellationToken cancellationToken = default);
     Task<ProductImageDto> AddImageAsync(Guid userId, Guid productId, UploadProductImageRequest request, CancellationToken cancellationToken = default);
+    Task<ProductImageDto> UploadAndAddImageAsync(Guid userId, Guid productId, Stream fileStream, string fileName, bool isCover, int position, CancellationToken cancellationToken = default);
     Task DeleteImageAsync(Guid userId, Guid productId, Guid imageId, CancellationToken cancellationToken = default);
     Task ReorderImagesAsync(Guid userId, Guid productId, ReorderProductImagesRequest request, CancellationToken cancellationToken = default);
     Task<ProductDetailDto> PublishAsync(Guid userId, Guid productId, CancellationToken cancellationToken = default);

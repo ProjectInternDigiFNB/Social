@@ -1,7 +1,6 @@
 using Application.DTOs.Profile.Requests;
 using Application.DTOs.Profile.Responses;
 using Application.Interfaces;
-using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,17 +12,13 @@ namespace API.Controllers;
 public class ProfileController : ControllerBase
 {
     private readonly IProfileService _profileService;
-    private readonly IValidator<UpdateProfileRequestDto> _updateValidator;
 
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSizeInBytes = 5 * 1024 * 1024; // 5 MB
 
-    public ProfileController(
-        IProfileService profileService,
-        IValidator<UpdateProfileRequestDto> updateValidator)
+    public ProfileController(IProfileService profileService)
     {
         _profileService = profileService;
-        _updateValidator = updateValidator;
     }
 
     /// <summary>
@@ -49,12 +44,6 @@ public class ProfileController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _updateValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         var profile = await _profileService.UpdateProfileAsync(request, cancellationToken);
         return Ok(profile);
     }

@@ -53,6 +53,14 @@ public class ShopSanction : BaseEntity
     }
 
     /// <summary>
+    /// Kiểm tra chế tài đình chỉ hoạt động (không tính mức Cảnh cáo - Warning) có đang còn hiệu lực hay không
+    /// </summary>
+    public bool IsSuspensionActive(DateTime nowUtc)
+    {
+        return Type != ShopSanctionType.Warning && IsActive(nowUtc);
+    }
+
+    /// <summary>
     /// Admin gỡ bỏ chế tài xử phạt
     /// </summary>
     public void Lift(Guid adminId)

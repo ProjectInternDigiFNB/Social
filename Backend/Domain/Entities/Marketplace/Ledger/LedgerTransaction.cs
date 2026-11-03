@@ -42,4 +42,28 @@ public class LedgerTransaction : BaseEntity
     {
         Entries.Add(entry);
     }
+
+    /// <summary>
+    /// Kiểm tra bất biến sổ cái kép: Có ít nhất 2 bút toán, Tổng Nợ == Tổng Có và lớn hơn 0.
+    /// </summary>
+    public void EnsureBalanced()
+    {
+        if (Entries.Count < 2)
+        {
+            throw new ArgumentException("Một giao dịch sổ cái phải có ít nhất 2 bút toán (Nợ và Có).");
+        }
+
+        var totalDebit = Entries.Sum(e => e.Debit);
+        var totalCredit = Entries.Sum(e => e.Credit);
+
+        if (totalDebit != totalCredit)
+        {
+            throw new InvalidOperationException($"Bút toán sổ cái không cân: Tổng Nợ ({totalDebit}) != Tổng Có ({totalCredit}).");
+        }
+
+        if (totalDebit <= 0)
+        {
+            throw new InvalidOperationException("Tổng số tiền của giao dịch sổ cái phải lớn hơn 0.");
+        }
+    }
 }

@@ -36,11 +36,17 @@ public class Checkout : BaseEntity
         long discountTotal,
         long grandTotal,
         DateTime expiresAtUtc,
-        string? idempotencyKey = null)
+        string? idempotencyKey = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(checkoutNo)) throw new ArgumentException("CheckoutNo không hợp lệ.", nameof(checkoutNo));
         if (buyerUserId == Guid.Empty) throw new ArgumentException("BuyerUserId không hợp lệ.", nameof(buyerUserId));
         if (grandTotal <= 0) throw new ArgumentException("Tổng số tiền phải lớn hơn 0.", nameof(grandTotal));
+
+        if (id.HasValue && id.Value != Guid.Empty)
+        {
+            Id = id.Value;
+        }
 
         CheckoutNo = checkoutNo.Trim().ToUpperInvariant();
         BuyerUserId = buyerUserId;

@@ -7,9 +7,7 @@ using Application.Interfaces.Repositories;
 using Domain.Entities.Marketplace.Orders;
 using Domain.Entities.Marketplace.Products;
 using Domain.Enums;
-using Infrastructure.External.Realtime;
 using Infrastructure.Persistence;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -21,7 +19,7 @@ public sealed class CheckoutService : ICheckoutService
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
     private readonly ILedgerService _ledgerService;
-    private readonly IHubContext<SocialHub> _hubContext;
+    private readonly IRealtimeNotificationService _realtimeNotificationService;
     private readonly ILogger<CheckoutService> _logger;
 
     public CheckoutService(
@@ -29,14 +27,14 @@ public sealed class CheckoutService : ICheckoutService
         IUnitOfWork unitOfWork,
         INotificationService notificationService,
         ILedgerService ledgerService,
-        IHubContext<SocialHub> hubContext,
+        IRealtimeNotificationService realtimeNotificationService,
         ILogger<CheckoutService> logger)
     {
         _context = context;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
         _ledgerService = ledgerService;
-        _hubContext = hubContext;
+        _realtimeNotificationService = realtimeNotificationService;
         _logger = logger;
     }
 
@@ -190,10 +188,8 @@ public sealed class CheckoutService : ICheckoutService
                 0L,
                 itemsTotal,
                 expiresAtUtc,
-                request.IdempotencyKey);
-
-            // Gán Id thủ công để khớp với checkoutId đã cập nhật vào DigitalCodes
-            typeof(Domain.Common.BaseEntity).GetProperty("Id")?.SetValue(checkout, checkoutId);
+                request.IdempotencyKey,
+                checkoutId);
 
             foreach (var item in checkoutItems)
             {
@@ -500,23 +496,12 @@ public sealed class CheckoutService : ICheckoutService
                 await _ledgerService.SettleCheckoutPaymentAsync(checkoutId, payment, cancellationToken);
 
                 // Phát SignalR thông báo thanh toán thành công tới client đang mở trang Checkout
-                try
-                {
-                    await _hubContext.Clients.Group($"checkout_{checkoutId}").SendAsync("PaymentSucceeded", new
-                    {
-                        checkoutId = checkoutId,
-                        paymentId = payment.Id,
-                        amount = payment.Amount,
-                        status = "Succeeded",
-                        paidAt = DateTime.UtcNow
-                    }, cancellationToken);
-
-                    _logger.LogInformation("MockPay đã phát SignalR PaymentSucceeded tới group checkout_{CheckoutId}", checkoutId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Lỗi khi phát SignalR PaymentSucceeded từ MockPay cho Checkout {CheckoutId}", checkoutId);
-                }
+                await _realtimeNotificationService.PublishPaymentSucceededAsync(
+                    checkoutId,
+                    payment.Id,
+                    payment.Amount,
+                    DateTime.UtcNow,
+                    cancellationToken);
             }
             catch (Exception ex)
             {

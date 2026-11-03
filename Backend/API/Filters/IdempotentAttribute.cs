@@ -1,10 +1,7 @@
 using System.Text.Json;
 using Application.Common;
-using Domain.Entities;
-using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +9,7 @@ namespace API.Filters;
 
 /// <summary>
 /// Attribute đánh dấu Action cần bảo vệ Idempotent (chống click đúp, retry trùng lặp)
-/// Dựa trên header 'Idempotency-Key' và bảng IdempotencyRecords trong PostgreSQL.
+/// Dựa trên header 'Idempotency-Key' và dịch vụ IIdempotencyService.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public class IdempotentAttribute : Attribute, IAsyncActionFilter
@@ -44,7 +41,7 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
             return;
         }
 
-        var dbContext = httpContext.RequestServices.GetRequiredService<SocialDbContext>();
+        var idempotencyService = httpContext.RequestServices.GetRequiredService<IIdempotencyService>();
         var currentUserService = httpContext.RequestServices.GetRequiredService<ICurrentUserService>();
         var logger = httpContext.RequestServices.GetRequiredService<ILogger<IdempotentAttribute>>();
 
@@ -52,10 +49,7 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
         var endpoint = request.Path.Value?.ToLowerInvariant() ?? string.Empty;
 
         // 1. Kiểm tra xem request này đã từng xử lý thành công trước đó chưa
-        var existing = await dbContext.IdempotencyRecords
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Key == key && r.UserId == userId && r.Endpoint == endpoint, httpContext.RequestAborted);
-
+        var existing = await idempotencyService.GetAsync(key, userId, endpoint, httpContext.RequestAborted);
         if (existing != null)
         {
             logger.LogInformation("Idempotent HIT: Yêu cầu với Key='{Key}', UserId='{UserId}', Endpoint='{Endpoint}' đã được phục vụ từ bản ghi lưu trữ.",
@@ -88,25 +82,19 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
                         WriteIndented = false
                     });
 
-                    var record = new IdempotencyRecord
+                    var stored = await idempotencyService.TryStoreAsync(
+                        key,
+                        userId,
+                        endpoint,
+                        statusCode,
+                        responseJson,
+                        CancellationToken.None);
+
+                    if (stored)
                     {
-                        Key = key,
-                        UserId = userId,
-                        Endpoint = endpoint,
-                        StatusCode = statusCode,
-                        ResponseBody = responseJson
-                    };
-
-                    dbContext.IdempotencyRecords.Add(record);
-                    await dbContext.SaveChangesAsync(CancellationToken.None);
-
-                    logger.LogInformation("Idempotent STORED: Đã lưu bản ghi Idempotency cho Key='{Key}', Endpoint='{Endpoint}'.",
-                        key, endpoint);
-                }
-                catch (DbUpdateException ex)
-                {
-                    // Trường hợp 2 request đồng thời cùng Key: Unique index ngăn chặn bản ghi thứ 2
-                    logger.LogWarning(ex, "Xung đột ghi IdempotencyRecord đồng thời cho Key='{Key}'. Bỏ qua lưu đúp.", key);
+                        logger.LogInformation("Idempotent STORED: Đã lưu bản ghi Idempotency cho Key='{Key}', Endpoint='{Endpoint}'.",
+                            key, endpoint);
+                    }
                 }
                 catch (Exception ex)
                 {

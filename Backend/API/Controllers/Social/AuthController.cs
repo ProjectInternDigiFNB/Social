@@ -2,7 +2,6 @@ using API.Auth;
 using Application.DTOs.Auth.Requests;
 using Application.DTOs.Auth.Responses;
 using Application.Interfaces;
-using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -12,29 +11,10 @@ namespace API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IValidator<RegisterRequestDto> _registerValidator;
-    private readonly IValidator<ResendConfirmationRequestDto> _resendValidator;
-    private readonly IValidator<LoginRequestDto> _loginValidator;
-    private readonly IValidator<GoogleLoginRequestDto> _googleLoginValidator;
-    private readonly IValidator<ForgotPasswordRequestDto> _forgotPasswordValidator;
-    private readonly IValidator<ResetPasswordRequestDto> _resetPasswordValidator;
 
-    public AuthController(
-        IAuthService authService,
-        IValidator<RegisterRequestDto> registerValidator,
-        IValidator<ResendConfirmationRequestDto> resendValidator,
-        IValidator<LoginRequestDto> loginValidator,
-        IValidator<GoogleLoginRequestDto> googleLoginValidator,
-        IValidator<ForgotPasswordRequestDto> forgotPasswordValidator,
-        IValidator<ResetPasswordRequestDto> resetPasswordValidator)
+    public AuthController(IAuthService authService)
     {
         _authService = authService;
-        _registerValidator = registerValidator;
-        _resendValidator = resendValidator;
-        _loginValidator = loginValidator;
-        _googleLoginValidator = googleLoginValidator;
-        _forgotPasswordValidator = forgotPasswordValidator;
-        _resetPasswordValidator = resetPasswordValidator;
     }
 
     /// <summary>
@@ -46,12 +26,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _registerValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         await _authService.RegisterAsync(request, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, new { message = "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản." });
     }
@@ -87,12 +61,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _resendValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         await _authService.ResendConfirmationAsync(request, cancellationToken);
         return Ok(new { message = "Nếu email tồn tại và chưa xác minh, liên kết xác minh mới đã được gửi." });
     }
@@ -106,12 +74,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _loginValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _authService.LoginAsync(request, ipAddress, cancellationToken);
 
@@ -134,12 +96,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _googleLoginValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _authService.GoogleLoginAsync(request, ipAddress, cancellationToken);
 
@@ -228,12 +184,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _forgotPasswordValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         await _authService.ForgotPasswordAsync(request, cancellationToken);
         return Ok(new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hộp thư của bạn." });
     }
@@ -247,12 +197,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken cancellationToken)
     {
-        var validationResult = await _resetPasswordValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
-        }
-
         await _authService.ResetPasswordAsync(request, cancellationToken);
         return Ok(new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới." });
     }

@@ -1,4 +1,5 @@
 using Application.DTOs.Comments;
+using Application.DTOs.Notifications;
 using Application.DTOs.Posts;
 using Application.DTOs.Realtime;
 
@@ -33,4 +34,19 @@ public interface IRealtimeNotificationService
     /// Phát sự kiện khi một bài viết bị xóa để các client lập tức loại bỏ khỏi bảng tin
     /// </summary>
     Task PublishPostDeletedAsync(Guid postId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gửi thông báo đã lưu DB (ReceivePersistentNotification) tới group cá nhân của User
+    /// </summary>
+    Task SendPersistentNotificationToUserAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát sự kiện cập nhật tồn kho sản phẩm số (ProductStockUpdated) tới toàn bộ client
+    /// </summary>
+    Task PublishProductStockUpdatedAsync(Guid productId, string productSlug, Guid variantId, int availableStock, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát sự kiện thanh toán thành công (PaymentSucceeded) tới group phiên Checkout đang mở
+    /// </summary>
+    Task PublishPaymentSucceededAsync(Guid checkoutId, Guid paymentId, long amount, DateTime paidAtUtc, CancellationToken cancellationToken = default);
 }

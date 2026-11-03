@@ -34,6 +34,7 @@ public interface IDigitalCodeRepository
         CancellationToken cancellationToken = default);
 
     Task<InventorySummary> GetInventorySummaryAsync(Guid variantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetDeliveredEncryptedValuesByOrderItemIdAsync(Guid orderItemId, CancellationToken cancellationToken = default);
 }
 
 public interface IDigitalFileRepository

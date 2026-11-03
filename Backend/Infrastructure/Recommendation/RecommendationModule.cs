@@ -1,15 +1,12 @@
 using Application.Interfaces.Recommendation;
-using Infrastructure.Recommendation.Aggregator;
 using Infrastructure.Recommendation.CandidateGenerators;
 using Infrastructure.Recommendation.Collaborative;
-using Infrastructure.Recommendation.Diversity;
-using Infrastructure.Recommendation.Ranking;
 using Infrastructure.Recommendation.Semantic;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Infrastructure.Recommendation;
 
-/// <summary>Đăng ký toàn bộ pipeline gợi ý nội dung (Candidate Generators, Aggregator, Ranking, Diversity, Service).</summary>
+/// <summary>Đăng ký các bộ sinh ứng viên (Candidate Generators) và truy vấn đặc thù CSDL của module Recommendation.</summary>
 public static class RecommendationModule
 {
     public static IServiceCollection AddRecommendationModule(this IServiceCollection services)
@@ -26,10 +23,7 @@ public static class RecommendationModule
         services.AddScoped<ICandidateGenerator, CollaborativeCandidateGenerator>();
         services.AddScoped<ICandidateGenerator, SemanticCandidateGenerator>();
 
-        // Pipeline components
-        services.AddScoped<ICandidateAggregator, CandidateAggregator>();
-        services.AddScoped<IRecommendationRankingService, RecommendationRankingService>();
-        services.AddScoped<IDiversityService, DiversityService>();
+        // Orchestration Service
         services.AddScoped<IRecommendationService, RecommendationService>();
 
         return services;

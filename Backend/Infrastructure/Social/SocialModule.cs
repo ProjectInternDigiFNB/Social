@@ -1,19 +1,17 @@
-﻿using Infrastructure.Social.Auth;
-using Infrastructure.Social.Profile;
-using Infrastructure.Social.Posts;
-using Infrastructure.Social.Comments;
-using Infrastructure.Social.Follows;
-using Infrastructure.Social.Interests;
-using Infrastructure.Social.Interactions;
-using Infrastructure.Social.Notifications;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
-using Infrastructure.Persistence.Repositories;
+using Infrastructure.Social.Auth;
+using Infrastructure.Social.Comments;
+using Infrastructure.Social.Follows;
+using Infrastructure.Social.Interactions;
+using Infrastructure.Social.Interests;
+using Infrastructure.Social.Notifications;
+using Infrastructure.Social.Posts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Infrastructure.Social;
 
-/// <summary>Đăng ký repository và service của module Social (user, post, comment, follow, notification...).</summary>
+/// <summary>Đăng ký repository và hạ tầng realtime của module Social.</summary>
 public static class SocialModule
 {
     public static IServiceCollection AddSocialModule(this IServiceCollection services)
@@ -32,17 +30,7 @@ public static class SocialModule
         services.AddScoped<IUserInteractionRepository, UserInteractionRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
-        services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IProfileService, ProfileService>();
-        services.AddScoped<IInterestService, InterestService>();
-        services.AddScoped<IPostService, PostService>();
-        services.AddScoped<IFeedService, FeedService>();
-        services.AddScoped<ILikeService, LikeService>();
-        services.AddScoped<ICommentService, CommentService>();
-        services.AddScoped<IFollowService, FollowService>();
-        services.AddScoped<IInteractionService, InteractionService>();
         services.AddScoped<IRealtimeNotificationService, RealtimeNotificationService>();
-        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }
