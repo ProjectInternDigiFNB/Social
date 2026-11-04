@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { ENV } from '@/config';
 import { getApiErrorMessage } from '@/utils/error';
 import { seenPostsService } from '@/utils/seenPosts';
+import { authSync } from '@/utils/authSync';
 
 export { getApiErrorMessage };
 
@@ -15,43 +16,9 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor: Gắn Access Token từ Zustand store và danh sách bài đã xem
+// Request interceptor: Gắn Access Token từ Zustand store và danh sách bài đã xem (Non-blocking)
 apiClient.interceptors.request.use(
-  async (config) => {
-    // Không chờ đối với các endpoint auth cơ bản và profile nội bộ để tránh deadlock
-    const isAuthRoute =
-      config.url?.includes('/auth/login') ||
-      config.url?.includes('/auth/register') ||
-      config.url?.includes('/auth/refresh') ||
-      config.url?.includes('/auth/forgot-password') ||
-      config.url?.includes('/auth/reset-password') ||
-      config.url?.includes('/profile/me');
-
-    // Nếu đang trong quá trình khôi phục phiên đăng nhập (F5/Reload trang),
-    // chỉ tạm dừng nếu CHƯA có token (chờ refresh token cấp token xong).
-    // Nếu đã có token hoặc request thuộc auth/profile thì gửi ngay lập tức.
-    if (!isAuthRoute && useAuthStore.getState().isInitializing && !useAuthStore.getState().accessToken) {
-      await new Promise<void>((resolve) => {
-        if (!useAuthStore.getState().isInitializing || useAuthStore.getState().accessToken) {
-          resolve();
-          return;
-        }
-        let timer: ReturnType<typeof setTimeout>;
-        const unsubscribe = useAuthStore.subscribe((state) => {
-          // Mở khóa ngay khi có Access Token hoặc khi quá trình phục hồi kết thúc
-          if (state.accessToken || !state.isInitializing) {
-            clearTimeout(timer);
-            unsubscribe();
-            resolve();
-          }
-        });
-        timer = setTimeout(() => {
-          unsubscribe();
-          resolve();
-        }, 6000);
-      });
-    }
-
+  (config) => {
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -90,13 +57,13 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response interceptor: Bắt 401 để kích hoạt Refresh Token im lặng
+// Response interceptor: Single-flight Reactive Refresh bắt mã 401
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Không thử refresh nếu là các API auth cơ bản hoặc request đã retry
+    // Không thử refresh nếu là các API auth cơ bản hoặc request đã từng retry
     const isAuthRoute =
       originalRequest?.url?.includes('/auth/login') ||
       originalRequest?.url?.includes('/auth/register') ||
@@ -105,8 +72,9 @@ apiClient.interceptors.response.use(
       originalRequest?.url?.includes('/auth/reset-password');
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute) {
+      // Nếu đã có 1 request refresh đang chạy trong tab, xếp vào hàng đợi chờ kết quả
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<string | null>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
           if (token) {
@@ -130,12 +98,22 @@ apiClient.interceptors.response.use(
         const newAccessToken = refreshResponse.data.accessToken;
         useAuthStore.getState().setAccessToken(newAccessToken);
 
+        // Đồng bộ token mới sang các tab khác đang mở
+        authSync.broadcast({
+          type: 'AUTH_TOKEN_REFRESHED',
+          accessToken: newAccessToken,
+        });
+
         processQueue(null, newAccessToken);
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         useAuthStore.getState().clearAuth();
+
+        // Đồng bộ sự kiện đăng xuất / hết phiên sang các tab khác
+        authSync.broadcast({ type: 'AUTH_LOGOUT' });
+
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
