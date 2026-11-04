@@ -9,9 +9,9 @@ export interface AdminRouteProps {
 }
 
 export const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
-  const { user, isAuthenticated, isInitializing } = useAuthStore();
+  const { user, isAuthenticated, isInitializing, hasHydrated } = useAuthStore();
 
-  if (isInitializing) {
+  if (!hasHydrated || isInitializing) {
     return <LoadingScreen message="Đang xác thực quyền Quản trị viên..." />;
   }
 

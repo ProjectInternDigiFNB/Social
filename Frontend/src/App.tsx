@@ -7,6 +7,8 @@ import { profileApi } from '@/api/profileApi';
 import { AppRoutes } from '@/routes/AppRoutes';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { signalrService } from '@/services/signalrService';
+import { isTokenValid } from '@/utils/token';
+import { authSync } from '@/utils/authSync';
 
 // Singleton promise để deduplicate quá trình khôi phục phiên khi F5 hoặc React StrictMode mount 2 lần
 let restoreSessionPromise: Promise<void> | null = null;
@@ -17,14 +19,33 @@ export const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Khôi phục phiên làm việc im lặng (Silent Refresh) khi reload trang
-    const restoreSession = async () => {
+    // Lắng nghe sự kiện đồng bộ đăng nhập/đăng xuất từ các tab khác
+    const unsubscribeSync = authSync.subscribe((event) => {
+      if (event.type === 'AUTH_TOKEN_REFRESHED') {
+        useAuthStore.getState().setAccessToken(event.accessToken);
+      } else if (event.type === 'AUTH_LOGOUT') {
+        useAuthStore.getState().clearAuth();
+      }
+    });
+
+    const initSession = async () => {
+      const currentToken = useAuthStore.getState().accessToken;
+
+      // 1. Nếu token đã có sẵn trong store và vẫn còn hạn sử dụng (JWT exp >= 30s)
+      // -> Bỏ qua toàn bộ refresh và profile/me! Mở khóa khởi tạo ngay tức thì (0ms).
+      if (currentToken && isTokenValid(currentToken)) {
+        if (isMounted) {
+          setInitializing(false);
+        }
+        return;
+      }
+
+      // 2. Nếu chưa có token hoặc token đã hết hạn -> Thử khôi phục qua HttpOnly Cookie
       if (!restoreSessionPromise) {
         restoreSessionPromise = (async () => {
           try {
             const refreshData = await authApi.refresh();
             if (refreshData?.accessToken) {
-              // Gán tạm token để request profile đính kèm Authorization header
               useAuthStore.getState().setAccessToken(refreshData.accessToken);
               const profile = await profileApi.getMyProfile();
               if (isMounted) {
@@ -43,7 +64,7 @@ export const App: React.FC = () => {
               clearAuth();
             }
           } catch (err: unknown) {
-            // Nếu request bị trình duyệt hủy do người dùng reload tiếp (CanceledError) -> Không clearAuth
+            // Nếu request bị hủy do người dùng reload trang tiếp
             if (
               axios.isCancel(err) ||
               (err as { name?: string })?.name === 'CanceledError' ||
@@ -51,7 +72,7 @@ export const App: React.FC = () => {
             ) {
               return;
             }
-            // Không có cookie refresh token hoặc token thực sự hết hạn
+            // Không có cookie refresh token hoặc token hết hạn
             if (isMounted) {
               clearAuth();
             }
@@ -67,10 +88,11 @@ export const App: React.FC = () => {
       await restoreSessionPromise;
     };
 
-    restoreSession();
+    initSession();
 
     return () => {
       isMounted = false;
+      unsubscribeSync();
     };
   }, [setAuth, clearAuth, setInitializing]);
 

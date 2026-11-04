@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/api/authApi';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
+import { authSync } from '@/utils/authSync';
 
 /**
  * Custom hook quản lý trạng thái xác thực và các hành động Auth
@@ -17,6 +18,7 @@ export function useAuth() {
       console.error('Logout error:', err);
     } finally {
       store.clearAuth();
+      authSync.broadcast({ type: 'AUTH_LOGOUT' });
       navigate(ROUTES.AUTH.LOGIN);
     }
   };

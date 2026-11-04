@@ -13,9 +13,9 @@ export interface GuestRouteProps {
  * Nếu đã đăng nhập thì tự động điều hướng sang trang Hồ sơ cá nhân.
  */
 export const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
-  const { isAuthenticated, isInitializing } = useAuthStore();
+  const { isAuthenticated, isInitializing, hasHydrated } = useAuthStore();
 
-  if (isInitializing) {
+  if (!hasHydrated || isInitializing) {
     return <LoadingScreen message="Đang khởi tạo..." />;
   }
 

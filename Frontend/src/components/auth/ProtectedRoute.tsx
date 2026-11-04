@@ -9,10 +9,10 @@ export interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isInitializing } = useAuthStore();
+  const { isAuthenticated, isInitializing, hasHydrated } = useAuthStore();
   const location = useLocation();
 
-  if (isInitializing) {
+  if (!hasHydrated || isInitializing) {
     return <LoadingScreen message="Đang kiểm tra phiên đăng nhập..." />;
   }
 
