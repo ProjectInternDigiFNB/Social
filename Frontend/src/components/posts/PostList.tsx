@@ -33,7 +33,7 @@ export const PostList: React.FC<PostListProps> = ({
   // Skeleton Loading Initial State (2 bài đầu tiên theo micro-batching)
   if (loading && posts.length === 0) {
     return (
-      <div className="posts-skeleton-stack" aria-busy="true" aria-label="Đang tải bài viết" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="posts-skeleton-stack" aria-busy="true" aria-label="Đang tải bài viết" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {[1, 2].map((i) => (
           <PostCardSkeleton key={i} />
         ))}
@@ -95,7 +95,7 @@ export const PostList: React.FC<PostListProps> = ({
 
         {/* Loading more skeleton at bottom */}
         {loadingMore && (
-          <div className="feed-loading-more-wrapper" style={{ marginTop: '0.75rem' }} aria-busy="true">
+          <div className="feed-loading-more-wrapper" aria-busy="true">
             <PostCardSkeleton />
           </div>
         )}

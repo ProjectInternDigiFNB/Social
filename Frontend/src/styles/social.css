@@ -352,6 +352,16 @@
 /* ==========================================================================
    10. POST ENTRY CARD (THE CORE CONTENT UNIT)
    ========================================================================== */
+.post-list-wrapper {
+  width: 100%;
+}
+
+.posts-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .post-entry {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
